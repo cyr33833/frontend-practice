@@ -1,0 +1,1 @@
+console.log("Hello,外部JavaScript文件的导入示例。");

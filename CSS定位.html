@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS浮动</title>
+    <style>
+        .box1{
+            background-color: aquamarine;
+            height:350px; 
+        }
+        .box-normal{
+            width: 100px;
+            height: 100px;
+            background-color: yellowgreen;
+        }
+        .box-relative{
+            background-color: yellow;
+            position: relative;
+            left: 10px;
+            top: 10px;
+        }
+        .box2{
+            background-color: aquamarine;
+            height:350px; 
+        }
+        .box-absolute{
+            width: 100px;
+            height: 100px;
+            background-color: yellow;
+            position: absolute;
+            left: 100px;
+        }
+        .box3{
+            width: 100px;
+            height: 100px;
+            background-color: blue ;
+            position: fixed;
+            right:0;
+            top: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>相对定位</h1>
+    <div class="box1">
+        <div class="box-normal">这是一个正常的div标签</div>
+        <div class="box-normal">这是一个正常的div标签</div>
+        <div class="box-relative">这是一个相对定位的div标签</div>
+    </div>
+    <h1>绝对定位</h1>
+     <div class="box2">
+        <div class="box-normal">这是一个正常的div标签</div>
+        <div class="box-normal">这是一个正常的div标签</div>
+        <div class="box-absolute">这是一个绝对定位的div标签</div>
+    </div>
+    <h1>固定定位</h1>
+    <div class="box3">这是一个固定定位的div标签</div>
+</body>
+</html>

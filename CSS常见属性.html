@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS常见属性</title>
+
+    <style>
+        .block {
+            background-color: rgb(228, 230, 215);
+            width: 200px;
+            height: 100px;
+        }
+        .inline {
+            background-color: rgb(74, 74, 71);
+        }
+        .span-inline-block {
+            /*display: inline-block;*/
+            display: block; 
+            background-color: rgb(228, 230, 215);
+            /*width: 200px;*/
+            height: 100px;
+        } 
+    </style>
+</head>
+<body>
+    <h1 style="font: bolder 50px 'KaiTi';">这是一个font复合文本</h1>
+    <p style="line-height: 40px">这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本这是一段长文本</p>
+    <div class="block">这是一个块级元素</div>
+    <span class="inline">这是一个行内元素</span>
+    <h2>diplay</h2>
+    <div style="display: inline;background-color: rgb(228, 230, 215);">这是一个转换成行内元素的div标签</div>
+    <span class="span-inline-block">这是一个转换成行内元素的span标签</span>
+</body>
+</html>

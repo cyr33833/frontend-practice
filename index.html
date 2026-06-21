@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序算法可视化大厅 - 前端练习</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 30, 49, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.4);
+            --purple-glow: rgba(139, 92, 246, 0.4);
+            --accent-glow: rgba(236, 72, 153, 0.4);
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            padding: 48px 24px 24px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #60a5fa, #c084fc, #f43f5e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 40px rgba(96, 165, 250, 0.2);
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        main {
+            width: 100%;
+            max-width: 1200px;
+            padding: 24px 24px 64px;
+            display: flex;
+            flex-direction: column;
+            gap: 48px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.15);
+        }
+
+        .card:hover::before {
+            transform: translateX(100%);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .algo-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .algo-en {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .badge-n2 {
+            background: rgba(244, 63, 94, 0.1);
+            color: #f43f5e;
+            border: 1px solid rgba(244, 63, 94, 0.2);
+        }
+
+        .badge-nlogn {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-stable {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .badge-unstable {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .algo-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 28px;
+            flex-grow: 1;
+        }
+
+        .enter-btn {
+            width: 100%;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            border: none;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .enter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--primary-glow);
+            filter: brightness(1.1);
+        }
+
+        .enter-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Comparison Table Section */
+        .comparison-section {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #f8fafc, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            color: var(--text-primary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-algo-name {
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .table-complexity {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stable-yes {
+            color: #10b981;
+        }
+
+        .stable-no {
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>算法之美 - 排序算法可视化大厅</h1>
+        <p class="subtitle">通过交互式可视化、实时数据面板和高帧率柱状图，直观探索经典排序算法在处理 500 个乱序元素时的逻辑运行过程与时间效率对比。</p>
+    </header>
+
+    <main>
+        <!-- Cards Grid -->
+        <div class="grid">
+            <!-- Bubble Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">冒泡排序</div>
+                            <div class="algo-en">Bubble Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-n2">O(n²)</span>
+                        <span class="badge badge-stable">稳定</span>
+                    </div>
+                    <p class="algo-desc">通过相邻元素的不断比较和互换，使得较大（或较小）的元素像水底的气泡一样逐步“上浮”到数组的顶端。</p>
+                </div>
+                <a href="bubble_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Selection Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">选择排序</div>
+                            <div class="algo-en">Selection Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-n2">O(n²)</span>
+                        <span class="badge badge-unstable">不稳定</span>
+                    </div>
+                    <p class="algo-desc">每次从未排序的部分中寻找最小（或最大）的元素，将其存放到已排序序列的起始或末尾位置。</p>
+                </div>
+                <a href="selection_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Insertion Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">插入排序</div>
+                            <div class="algo-en">Insertion Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-n2">O(n) - O(n²)</span>
+                        <span class="badge badge-stable">稳定</span>
+                    </div>
+                    <p class="algo-desc">类似于摸牌整理手牌的过程，通过构建有序区间，对于未排序的数据在已排序区间中从后向前扫描，找到相应位置并插入。</p>
+                </div>
+                <a href="insertion_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Quick Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">快速排序</div>
+                            <div class="algo-en">Quick Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-nlogn">O(n log n)</span>
+                        <span class="badge badge-unstable">不稳定</span>
+                    </div>
+                    <p class="algo-desc">分治法杰作。选择一个基准值，将数组划分为大于和小于基准的两部分，然后递归地排序划分出的子数组。</p>
+                </div>
+                <a href="quick_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Merge Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">归并排序</div>
+                            <div class="algo-en">Merge Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-nlogn">O(n log n)</span>
+                        <span class="badge badge-stable">稳定</span>
+                    </div>
+                    <p class="algo-desc">分治法典型应用。将序列对半拆分成子序列，直到每个子序列长度为1，然后将它们逐步两两归并并保证合并后的区间有序。</p>
+                </div>
+                <a href="merge_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Heap Sort -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div>
+                            <div class="algo-name">堆排序</div>
+                            <div class="algo-en">Heap Sort</div>
+                        </div>
+                    </div>
+                    <div class="badge-container">
+                        <span class="badge badge-nlogn">O(n log n)</span>
+                        <span class="badge badge-unstable">不稳定</span>
+                    </div>
+                    <p class="algo-desc">利用二叉树形式的“大顶堆”或“小顶堆”结构进行选数排序，直接在原数组内调整位置，空间效率极高。</p>
+                </div>
+                <a href="heap_sort.html" class="enter-btn">
+                    进入演示
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="comparison-section">
+            <h2 class="section-title">算法效率及特性一览表</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>算法名称</th>
+                            <th>最好时间</th>
+                            <th>平均时间</th>
+                            <th>最坏时间</th>
+                            <th>空间复杂度</th>
+                            <th>稳定性</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="table-algo-name">冒泡排序 (Bubble Sort)</td>
+                            <td class="table-complexity">O(n)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(1)</td>
+                            <td class="stable-yes">稳定</td>
+                        </tr>
+                        <tr>
+                            <td class="table-algo-name">选择排序 (Selection Sort)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(1)</td>
+                            <td class="stable-no">不稳定</td>
+                        </tr>
+                        <tr>
+                            <td class="table-algo-name">插入排序 (Insertion Sort)</td>
+                            <td class="table-complexity">O(n)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(1)</td>
+                            <td class="stable-yes">稳定</td>
+                        </tr>
+                        <tr>
+                            <td class="table-algo-name">快速排序 (Quick Sort)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n²)</td>
+                            <td class="table-complexity">O(log n)</td>
+                            <td class="stable-no">不稳定</td>
+                        </tr>
+                        <tr>
+                            <td class="table-algo-name">归并排序 (Merge Sort)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n)</td>
+                            <td class="stable-yes">稳定</td>
+                        </tr>
+                        <tr>
+                            <td class="table-algo-name">堆排序 (Heap Sort)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(n log n)</td>
+                            <td class="table-complexity">O(1)</td>
+                            <td class="stable-no">不稳定</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

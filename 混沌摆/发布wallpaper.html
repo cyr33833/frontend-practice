@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>混沌摆 · 壁纸版</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #050510;
+            /* 移除不需要的文字以防出现滚动条 */
+        }
+        canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // ---------- 物理参数 ----------
+            const g = 9.81;
+            const L1 = 0.8, m1 = 0.3, I1 = (1/12) * m1 * L1 * L1;
+            const L2 = 0.6, m2 = 0.2, I2 = (1/12) * m2 * L2 * L2;
+            const mb = 0.3;  
+
+            const a3 = I1 + (m1/4 + m2 + mb) * L1 * L1;
+            const a4 = (m2/2 + mb) * L1 * L2;
+            const a5 = I2 + (m2/4 + mb) * L2 * L2;
+            const a6 = (m1/2 + m2 + mb) * g * L1;
+            const a7 = (m2/2 + mb) * g * L2;
+
+            let theta1 = 0.0, theta2 = 0.0;
+            let omega1 = 9.0, omega2 = -14.0;
+            let timeSpeed = 0.4;
+            const dt = 0.0002, stepsPerFrame = 12;
+
+            let showTrail = true;
+            const maxTrailPoints = 400;
+            let trailPoints = [];
+
+            // ---------- 接入 Wallpaper Engine API ----------
+            window.wallpaperPropertyListener = {
+                applyUserProperties: function(properties) {
+                    // 监听用户在壁纸引擎里调节的“动画速度”滑块
+                    if (properties.timeSpeed) {
+                        timeSpeed = properties.timeSpeed.value;
+                    }
+                    // 监听“流星拖尾”开关
+                    if (properties.showTrail) {
+                        showTrail = properties.showTrail.value;
+                    }
+                    // 监听“重置/踹一脚”复选框行为 (用作触发器)
+                    if (properties.kickBall && properties.kickBall.value !== "") {
+                        omega2 += 5.0;
+                        omega1 += (Math.random() - 0.5) * 0.5;
+                    }
+                }
+            };
+
+            // ---------- 运动方程 ----------
+            function derivatives(th1, th2, w1, w2) {
+                const d12 = th1 - th2, sinD = Math.sin(d12), cosD = Math.cos(d12);
+                const M11 = a3, M12 = a4 * cosD, M21 = a4 * cosD, M22 = a5;
+                const det = M11 * M22 - M12 * M21;
+                const R1 = -a4 * w2 * w2 * sinD - a6 * Math.sin(th1);
+                const R2 =  a4 * w1 * w1 * sinD - a7 * Math.sin(th2);
+                return [w1, w2,
+                        (R1 * M22 - R2 * M12) / det,
+                        (M11 * R2 - M21 * R1) / det];
+            }
+
+            function rk4Step(th1, th2, w1, w2, h) {
+                const [a,b,c,d] = derivatives(th1, th2, w1, w2);
+                const [e,f,g,h1] = derivatives(th1+0.5*h*a, th2+0.5*h*b, w1+0.5*h*c, w2+0.5*h*d);
+                const [i,j,k,l] = derivatives(th1+0.5*h*e, th2+0.5*h*f, w1+0.5*h*g, w2+0.5*h*h1);
+                const [m,n,o,p] = derivatives(th1+h*i, th2+h*j, w1+h*k, w2+h*l);
+                return [
+                    th1 + (h/6)*(a+2*e+2*i+m),
+                    th2 + (h/6)*(b+2*f+2*j+n),
+                    w1  + (h/6)*(c+2*g+2*k+o),
+                    w2  + (h/6)*(d+2*h1+2*l+p)
+                ];
+            }
+
+            // ---------- 画布 ----------
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            const pivotX = () => canvas.width / 2;
+            const pivotY = () => canvas.height * 0.22;
+            const scale = () => Math.min(canvas.width, canvas.height) * 0.42;
+            function toScreen(x, y) { return [pivotX() + x * scale(), pivotY() + y * scale()]; }
+
+            function drawMeteorTrail() {
+                if (!showTrail || trailPoints.length < 2) return;
+                ctx.save();
+                for (let i = 0; i < trailPoints.length; i++) {
+                    const pt = trailPoints[i];
+                    const life = pt.life;
+                    if (life <= 0.01) continue;
+                    const radius = 1.5 + life * 3.5;
+                    const alpha = life * 0.85;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 180, 50, ${alpha})`;
+                    ctx.shadowColor = '#ff6600';
+                    ctx.shadowBlur = radius * 4;
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, radius * 0.5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 1.2})`;
+                    ctx.shadowBlur = radius * 2;
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // ---------- 动画循环 ----------
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = 0; i < stepsPerFrame; i++) {
+                    [theta1, theta2, omega1, omega2] = rk4Step(theta1, theta2, omega1, omega2, dt);
+                }
+
+                const x1j = L1 * Math.sin(theta1), y1j = L1 * Math.cos(theta1);
+                const x2e = x1j + L2 * Math.sin(theta2), y2e = y1j + L2 * Math.cos(theta2);
+                const [px1j, py1j] = toScreen(x1j, y1j);
+                const [px2e, py2e] = toScreen(x2e, y2e);
+                const [p0x, p0y] = toScreen(0, 0);
+
+                const decay = 0.02;
+                trailPoints.forEach(pt => pt.life -= decay);
+                trailPoints = trailPoints.filter(pt => pt.life > 0.01);
+                trailPoints.push({ x: px2e, y: py2e, life: 1.0 });
+                if (trailPoints.length > maxTrailPoints) trailPoints = trailPoints.slice(-maxTrailPoints);
+
+                drawMeteorTrail();
+
+                ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(p0x, p0y); ctx.lineTo(px1j, py1j);
+                ctx.strokeStyle = '#b8956a'; ctx.lineWidth = 10;
+                ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8;
+                ctx.stroke();
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+                ctx.beginPath(); ctx.moveTo(px1j, py1j); ctx.lineTo(px2e, py2e);
+                ctx.strokeStyle = '#b8956a'; ctx.lineWidth = 8;
+                ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6;
+                ctx.stroke();
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+                ctx.beginPath(); ctx.arc(p0x, p0y, 6, 0, 2*Math.PI); ctx.fillStyle = '#ddd'; ctx.fill();
+                ctx.beginPath(); ctx.arc(px1j, py1j, 5, 0, 2*Math.PI); ctx.fillStyle = '#bbb'; ctx.fill();
+
+                ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 25;
+                ctx.beginPath(); ctx.arc(px2e, py2e, 10, 0, 2*Math.PI);
+                ctx.fillStyle = '#ff8c3a'; ctx.fill();
+                ctx.shadowBlur = 12;
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+                const vx = L1*omega1*Math.cos(theta1) + L2*omega2*Math.cos(theta2);
+                const vy = -L1*omega1*Math.sin(theta1) - L2*omega2*Math.sin(theta2);
+                const speed = Math.sqrt(vx*vx + vy*vy);
+                if (speed > 0.5) {
+                    const arrowLen = Math.min(30, 25 / speed);
+                    ctx.beginPath(); ctx.moveTo(px2e, py2e);
+                    ctx.lineTo(px2e + vx*arrowLen, py2e - vy*arrowLen);
+                    ctx.strokeStyle = '#ffd966'; ctx.lineWidth = 2.5;
+                    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 10;
+                    ctx.stroke();
+                    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+                }
+
+                setTimeout(() => requestAnimationFrame(draw), 1000 / 60 / timeSpeed);
+            }
+            requestAnimationFrame(draw);
+        })();
+    </script>
+</body>
+</html>

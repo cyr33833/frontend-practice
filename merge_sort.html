@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>归并排序可视化 - 前端练习</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 30, 49, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.4);
+            --pink-glow: rgba(236, 72, 153, 0.4);
+            --accent-glow: rgba(139, 92, 246, 0.4);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s, transform 0.2s;
+            padding: 8px 16px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+        }
+
+        .back-btn:hover {
+            color: var(--text-primary);
+            transform: translateX(-4px);
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        main {
+            width: 100%;
+            max-width: 1200px;
+            padding: 0 24px 48px;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+        }
+
+        @media (max-width: 968px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .visualizer-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 400px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--primary-glow);
+            filter: brightness(1.1);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-grow: 1;
+            min-width: 200px;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .slider-container label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        input[type="range"] {
+            flex-grow: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #60a5fa;
+            box-shadow: 0 0 8px #3b82f6;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .complexity-badge {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .complexity-badge span:first-child {
+            color: var(--text-secondary);
+        }
+
+        .complexity-badge span:last-child {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            margin-bottom: 12px;
+        }
+
+        .explanation ul {
+            list-style-type: none;
+            margin-top: 12px;
+        }
+
+        .explanation li {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .explanation li::before {
+            content: "✦";
+            position: absolute;
+            left: 0;
+            color: #c084fc;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>归并排序 (Merge Sort) 可视化</h1>
+        <a href="index.html" class="back-btn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            返回大厅
+        </a>
+    </header>
+
+    <main>
+        <!-- Canvas & Controls -->
+        <div class="card visualizer-container">
+            <canvas id="canvas"></canvas>
+            
+            <div class="controls">
+                <button id="btn-start" class="btn-primary">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    开始排序
+                </button>
+                <button id="btn-pause" class="btn-secondary" disabled>
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    暂停
+                </button>
+                <button id="btn-reset" class="btn-secondary">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89H18v3z"></path></svg>
+                    随机打乱
+                </button>
+                
+                <div class="slider-container">
+                    <label for="speed-range">演示速度</label>
+                    <input type="range" id="speed-range" min="1" max="100" value="85">
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">已用时间</div>
+                    <div id="stat-time" class="stat-value">0.00s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">比较次数</div>
+                    <div id="stat-compare" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">写入次数</div>
+                    <div id="stat-swaps" class="stat-value">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Panels -->
+        <div class="side-panel">
+            <div class="card">
+                <h2>算法效率复杂度</h2>
+                <div class="complexity-badge">
+                    <span>最好时间复杂度</span>
+                    <span>O(n log n)</span>
+                </div>
+                <div class="complexity-badge">
+                    <span>平均时间复杂度</span>
+                    <span>O(n log n)</span>
+                </div>
+                <div class="complexity-badge">
+                    <span>最坏时间复杂度</span>
+                    <span>O(n log n)</span>
+                </div>
+                <div class="complexity-badge">
+                    <span>空间复杂度</span>
+                    <span>O(n)</span>
+                </div>
+                <div class="complexity-badge">
+                    <span>是否稳定排序</span>
+                    <span>是</span>
+                </div>
+            </div>
+
+            <div class="card explanation">
+                <span class="tag">工作原理</span>
+                <h2>什么是归并排序？</h2>
+                <p>归并排序是建立在归并操作上的一种有效的排序算法。它采用经典的**分治（Divide and Conquer）**策略：将已有序的子序列合并，得到完全有序的序列。即先使每个子序列有序，再使子序列段间有序。</p>
+                <ul>
+                    <li>**分割（Divide）**：将当前长度为 N 的序列分割成两个长度为 N/2 的子序列。</li>
+                    <li>**解决（Conquer）**：递归地对两个子序列进行归并排序。</li>
+                    <li>**合并（Combine）**：将两个排好序的子序列合并成一个有序序列。</li>
+                    <li>因为不管原始数据分布如何，其分割与归并操作都是对称进行的，所以归并排序的最坏、最好和平均时间复杂度均为相同的 $O(n \log n)$。</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Setup canvas
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            draw();
+        }
+
+        // State variables
+        const ARRAY_SIZE = 500;
+        let array = [];
+        let activeIndices = [];
+        let isRunning = false;
+        let isSorted = false;
+
+        // Stats
+        let compareCount = 0;
+        let swapCount = 0;
+        let startTime = 0;
+        let accumulatedTime = 0;
+        let timerInterval = null;
+
+        // Speed configurations
+        let delay = 1;
+        let stepsPerFrame = 1;
+
+        const speedRange = document.getElementById('speed-range');
+        function adjustSpeed(val) {
+            if (val <= 50) {
+                delay = (51 - val) * 4;
+                stepsPerFrame = 1;
+            } else {
+                delay = 1;
+                stepsPerFrame = (val - 50) * 2;
+            }
+        }
+        adjustSpeed(parseInt(speedRange.value));
+        speedRange.addEventListener('input', (e) => adjustSpeed(parseInt(e.target.value)));
+
+        const timeEl = document.getElementById('stat-time');
+        const compareEl = document.getElementById('stat-compare');
+        const swapsEl = document.getElementById('stat-swaps');
+
+        const btnStart = document.getElementById('btn-start');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+
+        // Initialize array
+        function initArray() {
+            array = [];
+            for (let i = 1; i <= ARRAY_SIZE; i++) {
+                array.push(i);
+            }
+            shuffle(array);
+            activeIndices = [];
+            isSorted = false;
+            isRunning = false;
+            compareCount = 0;
+            swapCount = 0;
+            accumulatedTime = 0;
+            resumeResolver = null;
+            updateStats();
+            stopTimer();
+            draw();
+
+            btnStart.disabled = false;
+            btnPause.disabled = true;
+            btnStart.innerHTML = `
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                开始排序
+            `;
+        }
+
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function updateStats() {
+            compareEl.textContent = compareCount;
+            swapsEl.textContent = swapCount;
+            const currentTotal = isRunning ? (accumulatedTime + (Date.now() - startTime)) : accumulatedTime;
+            timeEl.textContent = (currentTotal / 1000).toFixed(2) + 's';
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateStats, 30);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            if (isRunning) {
+                accumulatedTime += Date.now() - startTime;
+            }
+        }
+
+        function draw() {
+            const logicalWidth = canvas.width / window.devicePixelRatio;
+            const logicalHeight = canvas.height / window.devicePixelRatio;
+            
+            ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+            
+            const barWidth = logicalWidth / ARRAY_SIZE;
+            
+            for (let i = 0; i < array.length; i++) {
+                const val = array[i];
+                const barHeight = (val / ARRAY_SIZE) * (logicalHeight - 15);
+                const x = i * barWidth;
+                const y = logicalHeight - barHeight;
+                
+                if (isSorted) {
+                    ctx.fillStyle = '#10b981';
+                } else if (activeIndices.includes(i)) {
+                    ctx.fillStyle = '#ec4899';
+                } else {
+                    const grad = ctx.createLinearGradient(x, y, x, logicalHeight);
+                    grad.addColorStop(0, '#3b82f6');
+                    grad.addColorStop(1, '#8b5cf6');
+                    ctx.fillStyle = grad;
+                }
+                
+                ctx.fillRect(x, y, barWidth - 0.2, barHeight);
+            }
+        }
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Promise-based Pause System
+        let resumeResolver = null;
+        let opCounter = 0;
+
+        async function checkStep() {
+            if (!isRunning) {
+                stopTimer();
+                btnStart.disabled = false;
+                btnPause.disabled = true;
+                btnReset.disabled = false;
+                btnStart.innerHTML = `
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    继续排序
+                `;
+                
+                await new Promise(resolve => {
+                    resumeResolver = resolve;
+                });
+                
+                isRunning = true;
+                btnStart.disabled = true;
+                btnPause.disabled = false;
+                btnReset.disabled = true;
+                startTimer();
+            }
+
+            opCounter++;
+            if (opCounter >= stepsPerFrame) {
+                opCounter = 0;
+                draw();
+                updateStats();
+                await sleep(delay);
+            }
+        }
+
+        async function mergeSort(left, right) {
+            if (left >= right) return;
+            let mid = Math.floor((left + right) / 2);
+            await mergeSort(left, mid);
+            await mergeSort(mid + 1, right);
+            await merge(left, mid, right);
+        }
+
+        async function merge(left, mid, right) {
+            let temp = [];
+            let i = left, j = mid + 1;
+
+            while (i <= mid && j <= right) {
+                compareCount++;
+                activeIndices = [i, j];
+                await checkStep();
+
+                if (array[i] <= array[j]) {
+                    temp.push(array[i++]);
+                } else {
+                    temp.push(array[j++]);
+                }
+            }
+
+            while (i <= mid) {
+                activeIndices = [i];
+                await checkStep();
+                temp.push(array[i++]);
+            }
+
+            while (j <= right) {
+                activeIndices = [j];
+                await checkStep();
+                temp.push(array[j++]);
+            }
+
+            for (let k = 0; k < temp.length; k++) {
+                array[left + k] = temp[k];
+                swapCount++; // Treat writing back to main array as write operation
+                activeIndices = [left + k];
+                await checkStep();
+            }
+        }
+
+        async function startSorting() {
+            if (resumeResolver) {
+                const resolve = resumeResolver;
+                resumeResolver = null;
+                resolve();
+            } else {
+                isRunning = true;
+                btnStart.disabled = true;
+                btnPause.disabled = false;
+                btnReset.disabled = true;
+                startTimer();
+                opCounter = 0;
+                
+                await mergeSort(0, array.length - 1);
+                
+                if (isRunning) {
+                    isSorted = true;
+                    isRunning = false;
+                    stopTimer();
+                    updateStats();
+                    activeIndices = [];
+                    draw();
+
+                    btnStart.disabled = true;
+                    btnPause.disabled = true;
+                    btnReset.disabled = false;
+                }
+            }
+        }
+
+        function pause() {
+            isRunning = false;
+        }
+
+        btnStart.addEventListener('click', () => {
+            startSorting();
+        });
+
+        btnPause.addEventListener('click', () => {
+            if (isRunning) pause();
+        });
+
+        btnReset.addEventListener('click', () => {
+            initArray();
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        window.onload = () => {
+            resizeCanvas();
+            initArray();
+        };
+    </script>
+</body>
+</html>

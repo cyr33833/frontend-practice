@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方块尖刺碰撞 - 玻璃质感物理模拟</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Cyberpunk Neon Theme (Default) */
+            --bg-color: #05060b;
+            --grid-color: rgba(255, 0, 128, 0.05);
+            --spike-color: #ff0055;
+            --spike-glow: rgba(255, 0, 85, 0.4);
+            --glass-c1: rgba(0, 242, 254, 0.2);
+            --glass-c2: rgba(79, 172, 254, 0.05);
+            --glass-border: rgba(0, 242, 254, 0.75);
+            --glass-glow: rgba(0, 242, 254, 0.3);
+            --accent-color: #00f2fe;
+            --panel-bg: rgba(10, 12, 22, 0.65);
+            --panel-border: rgba(0, 242, 254, 0.2);
+            --text-color: #f0f3f8;
+            --text-muted: #8a99ad;
+            --glow-radius: 12px;
+        }
+
+        /* Class modifications for themes */
+        body.theme-glacial {
+            --bg-color: #0a0f1d;
+            --grid-color: rgba(0, 220, 255, 0.04);
+            --spike-color: #00dcf5;
+            --spike-glow: rgba(0, 220, 255, 0.4);
+            --glass-c1: rgba(255, 255, 255, 0.18);
+            --glass-c2: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --glass-glow: rgba(255, 255, 255, 0.2);
+            --accent-color: #ffffff;
+            --panel-bg: rgba(15, 25, 45, 0.65);
+            --panel-border: rgba(255, 255, 255, 0.2);
+        }
+
+        body.theme-magma {
+            --bg-color: #0f0502;
+            --grid-color: rgba(255, 100, 0, 0.04);
+            --spike-color: #ff5500;
+            --spike-glow: rgba(255, 85, 0, 0.4);
+            --glass-c1: rgba(255, 170, 0, 0.25);
+            --glass-c2: rgba(255, 85, 0, 0.03);
+            --glass-border: rgba(255, 200, 50, 0.85);
+            --glass-glow: rgba(255, 170, 0, 0.35);
+            --accent-color: #ffaa00;
+            --panel-bg: rgba(25, 10, 5, 0.65);
+            --panel-border: rgba(255, 85, 0, 0.2);
+        }
+
+        body.theme-emerald {
+            --bg-color: #020a06;
+            --grid-color: rgba(0, 255, 128, 0.04);
+            --spike-color: #00ff7f;
+            --spike-glow: rgba(0, 255, 127, 0.4);
+            --glass-c1: rgba(0, 255, 200, 0.2);
+            --glass-c2: rgba(0, 128, 64, 0.03);
+            --glass-border: rgba(0, 255, 150, 0.8);
+            --glass-glow: rgba(0, 255, 200, 0.25);
+            --accent-color: #00ffaa;
+            --panel-bg: rgba(5, 20, 12, 0.65);
+            --panel-border: rgba(0, 255, 127, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            transition: background-color 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Subtle grid background pattern */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Ambient background glow */
+        .ambient-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--glass-glow) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            filter: blur(80px);
+            opacity: 0.5;
+            z-index: 0;
+            transition: background 0.8s ease;
+        }
+
+        /* Main Layout Wrapper */
+        .container {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: row;
+            gap: 30px;
+            max-width: 1200px;
+            width: 95%;
+            align-items: stretch;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Canvas Viewport */
+        .viewport-wrapper {
+            position: relative;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            padding: 8px;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6),
+                        inset 0 0 30px rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: border-color 0.8s ease;
+        }
+
+        .viewport-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 20px;
+            box-shadow: 0 0 30px var(--glass-glow);
+            pointer-events: none;
+            opacity: 0.15;
+            transition: box-shadow 0.8s ease;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 14px;
+            background-color: #030407;
+            cursor: pointer;
+        }
+
+        /* Sidebar Control Panel */
+        .control-panel {
+            width: 320px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.8s ease, background 0.8s ease;
+        }
+
+        .header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 16px;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 30%, var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tagline {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Control Group */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-value {
+            color: var(--accent-color);
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+        }
+
+        /* Custom Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            outline: none;
+            transition: background 0.3s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-color);
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.5s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Theme Selector Buttons */
+        .theme-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .theme-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px 8px;
+            border-radius: 10px;
+            color: var(--text-color);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .theme-btn:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .theme-btn.active {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            box-shadow: 0 0 12px var(--glass-glow);
+        }
+
+        .theme-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Action Buttons */
+        .actions {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: #030407;
+            border: none;
+            box-shadow: 0 4px 15px var(--glass-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--glass-glow), 0 0 10px var(--accent-color);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* HUD Overlay on Canvas */
+        .hud {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-family: 'Outfit', sans-serif;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .hud-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .hud-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-color);
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .hud-slash {
+            color: var(--text-muted);
+            font-weight: 300;
+            font-size: 16px;
+        }
+
+        .hud-max {
+            color: var(--accent-color);
+            font-size: 14px;
+        }
+
+        /* Sound Alert Badge */
+        .sound-badge {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--panel-border);
+            border-radius: 30px;
+            padding: 6px 14px;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+            pointer-events: pointer;
+            cursor: pointer;
+            z-index: 15;
+            transition: all 0.3s ease;
+        }
+
+        .sound-badge:hover {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px var(--glass-glow);
+        }
+
+        .sound-badge svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                height: auto;
+            }
+            .control-panel {
+                width: 100%;
+                max-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow" id="ambientGlow"></div>
+
+    <div class="container">
+        <!-- Viewport Section -->
+        <div class="viewport-wrapper">
+            <div class="hud">
+                <div class="hud-label">稳定弹射膨胀值</div>
+                <div class="hud-value" id="hudBounce">
+                    <span id="bounceVal">0</span><span class="hud-slash">/</span><span class="hud-max" id="maxBounceVal">5</span>
+                </div>
+            </div>
+            
+            <div class="sound-badge" id="soundBadge" onclick="toggleAudioContext()">
+                <svg viewBox="0 0 24 24" id="soundIcon">
+                    <!-- Muted Icon by default -->
+                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.3 8.3v7.4h4.3l5.2 5.2V3.1L8.6 8.3H4.3z"/>
+                </svg>
+                <span id="soundBadgeText">点击开启声音</span>
+            </div>
+
+            <canvas id="canvas" width="680" height="580"></canvas>
+        </div>
+
+        <!-- Sidebar Section -->
+        <div class="control-panel">
+            <div class="header">
+                <h1>
+                    <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" stroke-linejoin="round"/>
+                        <path d="M12 8v8M8 12h8" stroke-linecap="round"/>
+                    </svg>
+                    方块尖刺碰撞
+                </h1>
+                <div class="tagline">玻璃质感的无损能量物理弹射模拟。方块与尖刺碰撞产生裂痕、膨胀，最后碎裂为落体碎片。</div>
+            </div>
+
+            <!-- Theme Selector -->
+            <div class="control-group">
+                <div class="control-label">能量氛围主题</div>
+                <div class="theme-selector">
+                    <button class="theme-btn active" onclick="setTheme('cyberpunk')">
+                        <span class="theme-dot" style="background-color: #ff0055;"></span>
+                        赛博霓虹
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('glacial')">
+                        <span class="theme-dot" style="background-color: #00dcf5;"></span>
+                        极地冰川
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('magma')">
+                        <span class="theme-dot" style="background-color: #ff5500;"></span>
+                        炽热熔岩
+                    </button>
+                    <button class="theme-btn" onclick="setTheme('emerald')">
+                        <span class="theme-dot" style="background-color: #00ff7f;"></span>
+                        翡翠幽谷
+                    </button>
+                </div>
+            </div>
+
+            <!-- Speed Control -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>弹射初速度</span>
+                    <span class="control-value" id="valSpeed">450 px/s</span>
+                </div>
+                <input type="range" id="slideSpeed" min="200" max="800" value="450" oninput="updateSpeedVal(this.value)">
+            </div>
+
+            <!-- Max Hits Control -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>完全碎裂所需碰撞次数</span>
+                    <span class="control-value" id="valMaxBounce">5 次</span>
+                </div>
+                <input type="range" id="slideMaxBounce" min="3" max="10" value="5" oninput="updateMaxBounceVal(this.value)">
+            </div>
+
+            <!-- Gravity Control -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>碎片坠落重力</span>
+                    <span class="control-value" id="valGravity">600 px/s²</span>
+                </div>
+                <input type="range" id="slideGravity" min="100" max="1500" value="600" oninput="updateGravityVal(this.value)">
+            </div>
+
+            <!-- Spike Height Control -->
+            <div class="control-group">
+                <div class="control-label">
+                    <span>边缘尖刺高度</span>
+                    <span class="control-value" id="valSpike">20 px</span>
+                </div>
+                <input type="range" id="slideSpike" min="12" max="35" value="20" oninput="updateSpikeVal(this.value)">
+            </div>
+
+            <!-- Action Controls -->
+            <div class="actions">
+                <button class="btn btn-primary" onclick="resetBlock()">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-2.62" stroke-linecap="round"/>
+                    </svg>
+                    重置动画
+                </button>
+                <button class="btn btn-secondary" onclick="togglePause()" id="btnPause">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="pauseIcon">
+                        <path d="M6 4h4v16H6zM14 4h4v16h-4z" stroke-linecap="round"/>
+                    </svg>
+                    <span id="pauseBtnText">暂停</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio Sound Synthesizer ---
+        let audioCtx = null;
+        let soundEnabled = false;
+        let volume = 0.5;
+
+        // Icons
+        const mutePath = "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.3 8.3v7.4h4.3l5.2 5.2V3.1L8.6 8.3H4.3z";
+        const playPath = "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z";
+
+        function toggleAudioContext() {
+            if (!audioCtx) {
+                // Initialize on first click
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            soundEnabled = !soundEnabled;
+            
+            const badgeText = document.getElementById('soundBadgeText');
+            const icon = document.getElementById('soundIcon');
+            
+            if (soundEnabled) {
+                badgeText.textContent = "声音: 已开启";
+                icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+            } else {
+                badgeText.textContent = "声音: 已静音";
+                icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.3 8.3v7.4h4.3l5.2 5.2V3.1L8.6 8.3H4.3z"/>';
+            }
+        }
+
+        // Play metallic/glass high pitch clink
+        function playClink(pitchMultiplier = 1.0) {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                let osc1 = audioCtx.createOscillator();
+                let osc2 = audioCtx.createOscillator();
+                let gain1 = audioCtx.createGain();
+                let gain2 = audioCtx.createGain();
+                
+                osc1.connect(gain1);
+                osc2.connect(gain2);
+                gain1.connect(audioCtx.destination);
+                gain2.connect(audioCtx.destination);
+                
+                let baseFreq = 1600 * pitchMultiplier;
+                
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+                
+                osc2.type = 'triangle';
+                osc2.frequency.setValueAtTime(baseFreq * 2.24, audioCtx.currentTime);
+                
+                let duration = 0.15;
+                gain1.gain.setValueAtTime(volume * 0.35, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                
+                gain2.gain.setValueAtTime(volume * 0.12, audioCtx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                
+                osc1.start();
+                osc2.start();
+                osc1.stop(audioCtx.currentTime + duration);
+                osc2.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Play violent glass explosion shatter
+        function playShatter() {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                // Synthesizing glass explosion using White Noise
+                let bufferSize = audioCtx.sampleRate * 1.5;
+                let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                let data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                let noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                
+                let filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(800, audioCtx.currentTime);
+                filter.Q.setValueAtTime(1, audioCtx.currentTime);
+                
+                let gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(volume * 0.6, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+                
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                noise.start();
+                noise.stop(audioCtx.currentTime + 1.5);
+                
+                // Add scattered metal clinks
+                for (let i = 0; i < 9; i++) {
+                    let delay = Math.random() * 250;
+                    setTimeout(() => {
+                        playClink(0.7 + Math.random() * 1.3);
+                    }, delay);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+
+        // --- Visual Themes Config ---
+        const themes = {
+            cyberpunk: {
+                bg: '#05060b',
+                grid: 'rgba(255, 0, 128, 0.05)',
+                spikes: '#ff0055',
+                spikesGlow: 'rgba(255, 0, 85, 0.4)',
+                glassC1: 'rgba(0, 242, 254, 0.22)',
+                glassC2: 'rgba(79, 172, 254, 0.04)',
+                glassBorder: 'rgba(0, 242, 254, 0.8)',
+                glassGlow: 'rgba(0, 242, 254, 0.35)',
+                accent: '#00f2fe',
+                particle: 'rgba(0, 242, 254, 0.8)'
+            },
+            glacial: {
+                bg: '#0a0f1d',
+                grid: 'rgba(0, 220, 255, 0.04)',
+                spikes: '#00dcf5',
+                spikesGlow: 'rgba(0, 220, 255, 0.4)',
+                glassC1: 'rgba(255, 255, 255, 0.18)',
+                glassC2: 'rgba(255, 255, 255, 0.03)',
+                glassBorder: 'rgba(255, 255, 255, 0.8)',
+                glassGlow: 'rgba(255, 255, 255, 0.25)',
+                accent: '#ffffff',
+                particle: 'rgba(255, 255, 255, 0.8)'
+            },
+            magma: {
+                bg: '#0f0502',
+                grid: 'rgba(255, 100, 0, 0.04)',
+                spikes: '#ff5500',
+                spikesGlow: 'rgba(255, 85, 0, 0.4)',
+                glassC1: 'rgba(255, 170, 0, 0.25)',
+                glassC2: 'rgba(255, 85, 0, 0.03)',
+                glassBorder: 'rgba(255, 200, 50, 0.85)',
+                glassGlow: 'rgba(255, 170, 0, 0.35)',
+                accent: '#ffaa00',
+                particle: 'rgba(255, 200, 50, 0.8)'
+            },
+            emerald: {
+                bg: '#020a06',
+                grid: 'rgba(0, 255, 128, 0.04)',
+                spikes: '#00ff7f',
+                spikesGlow: 'rgba(0, 255, 127, 0.4)',
+                glassC1: 'rgba(0, 255, 200, 0.2)',
+                glassC2: 'rgba(0, 128, 64, 0.03)',
+                glassBorder: 'rgba(0, 255, 150, 0.8)',
+                glassGlow: 'rgba(0, 255, 200, 0.25)',
+                accent: '#00ffaa',
+                particle: 'rgba(0, 255, 150, 0.8)'
+            }
+        };
+
+        let currentThemeKey = 'cyberpunk';
+        let currentTheme = themes[currentThemeKey];
+
+        function setTheme(themeKey) {
+            currentThemeKey = themeKey;
+            currentTheme = themes[themeKey];
+            
+            // Set body classes
+            document.body.className = '';
+            if (themeKey !== 'cyberpunk') {
+                document.body.classList.add(`theme-${themeKey}`);
+            }
+
+            // Sync theme buttons active classes
+            document.querySelectorAll('.theme-btn').forEach((btn, idx) => {
+                const keys = ['cyberpunk', 'glacial', 'magma', 'emerald'];
+                if (keys[idx] === themeKey) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Trigger a soft redraw/pulse on ambientGlow
+            const glow = document.getElementById('ambientGlow');
+            glow.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            setTimeout(() => {
+                glow.style.transform = 'translate(-50%, -50%) scale(1.0)';
+            }, 300);
+
+            // Re-apply styles to active block and shards
+            if (block) {
+                block.color = currentTheme.glassC1;
+                block.borderColor = currentTheme.glassBorder;
+            }
+            shards.forEach(s => {
+                s.color = currentTheme.glassC1;
+                s.borderColor = currentTheme.glassBorder;
+            });
+        }
+
+
+        // --- App Simulation Variables ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Physics parameters controllable from GUI
+        let baseSpeed = 450; 
+        let maxBounce = 5;
+        let gravityVal = 600;
+        let hSpike = 20;
+        const wSpike = 25; // fixed spike horizontal density width
+        let isPaused = false;
+
+        // Arena definition
+        const arena = {
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height
+        };
+
+        // Block definition
+        let block = null;
+        let shards = [];
+        let particles = [];
+        let particlesPool = [];
+        let nextSpawnTimer = 0; // delay to spawn a new block after shatter
+
+        class Block {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.vx = (Math.random() > 0.5 ? 1 : -1) * (baseSpeed / Math.SQRT2);
+                this.vy = (Math.random() > 0.5 ? 1 : -1) * (baseSpeed / Math.SQRT2);
+                this.baseSize = 65;
+                this.size = this.baseSize;
+                this.angle = Math.random() * Math.PI * 2;
+                this.vAngle = (Math.random() > 0.5 ? 1 : -1) * (0.8 + Math.random() * 0.8);
+                this.bounces = 0;
+                this.pulseScale = 1.0;
+                this.pulseTarget = 1.0;
+                this.crackLines = [];
+                this.active = true;
+                this.spawnProgress = 0.0; // fade in animation on spawn
+                
+                // Track visual values on HUD
+                updateHUD(0);
+            }
+
+            update(dt) {
+                if (this.spawnProgress < 1.0) {
+                    this.spawnProgress += dt * 2.0; // spawn fade duration 0.5s
+                    if (this.spawnProgress > 1.0) this.spawnProgress = 1.0;
+                }
+
+                // Update position
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+
+                // Update rotation
+                this.angle += this.vAngle * dt;
+
+                // Update pulse spring decay back to 1.0
+                if (this.pulseScale > 1.0) {
+                    this.pulseScale -= (this.pulseScale - 1.0) * 12 * dt;
+                    if (this.pulseScale < 1.005) this.pulseScale = 1.0;
+                }
+            }
+        }
+
+        // Particle class for tiny sparks/dust chipping off
+        class Particle {
+            init(x, y, vx, vy, color, size, life) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.size = size;
+                this.life = life;
+                this.maxLife = life;
+                this.active = true;
+            }
+
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.vy += gravityVal * 0.4 * dt; // slight gravity effect
+                this.life -= dt;
+                if (this.life <= 0) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Shard class representing structural falling glass fragments
+        class Shard {
+            constructor(x, y, vertices, vx, vy, angle, vAngle, color, borderColor) {
+                this.x = x;
+                this.y = y;
+                this.vertices = vertices; // array of 3 points: {x, y} relative to local centroid
+                this.vx = vx;
+                this.vy = vy;
+                this.angle = angle;
+                this.vAngle = vAngle;
+                this.alpha = 1.0;
+                this.fadeSpeed = 0.45 + Math.random() * 0.3; // fade out in ~1.5 - 2s
+                this.color = color;
+                this.borderColor = borderColor;
+            }
+
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                
+                // Add gravity
+                this.vy += gravityVal * dt;
+                
+                // Add air resistance
+                this.vx *= Math.exp(-0.4 * dt);
+                
+                this.angle += this.vAngle * dt;
+                this.alpha -= this.fadeSpeed * dt;
+
+                // Collision with bottom spikes (arena floor bounce)
+                let floorY = getSpikeBottomY(this.x);
+                if (this.y > floorY) {
+                    this.y = floorY;
+                    this.vy = -Math.abs(this.vy) * 0.25; // bounce with dampening
+                    this.vx *= 0.5; // lose side speed
+                    this.vAngle *= 0.5; // lose spin speed
+                    
+                    // trigger a tiny dust particle
+                    if (Math.random() < 0.15) {
+                        spawnSpark(this.x, this.y, (Math.random() - 0.5) * 80, -30 - Math.random() * 50, 1.5);
+                    }
+                }
+            }
+
+            draw(ctx) {
+                if (this.alpha <= 0) return;
+                
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                ctx.beginPath();
+                ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
+                for (let i = 1; i < this.vertices.length; i++) {
+                    ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
+                }
+                ctx.closePath();
+                
+                // fill glass style
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.alpha * 0.6;
+                ctx.fill();
+                
+                // draw glowing border
+                ctx.strokeStyle = this.borderColor;
+                ctx.globalAlpha = this.alpha * 0.9;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        }
+
+
+        // --- Procedural Generation & Math Helpers ---
+
+        // Get Top Spike boundary Y-coordinate for given X
+        function getSpikeTopY(x) {
+            let dx = x % wSpike;
+            if (dx < 0) dx += wSpike;
+            if (dx < wSpike / 2) {
+                return arena.y + (dx / (wSpike / 2)) * hSpike;
+            } else {
+                return arena.y + (1 - (dx - wSpike / 2) / (wSpike / 2)) * hSpike;
+            }
+        }
+
+        // Get Bottom Spike boundary Y-coordinate for given X
+        function getSpikeBottomY(x) {
+            let dx = x % wSpike;
+            if (dx < 0) dx += wSpike;
+            if (dx < wSpike / 2) {
+                return arena.y + arena.height - (dx / (wSpike / 2)) * hSpike;
+            } else {
+                return arena.y + arena.height - (1 - (dx - wSpike / 2) / (wSpike / 2)) * hSpike;
+            }
+        }
+
+        // Get Left Spike boundary X-coordinate for given Y
+        function getSpikeLeftX(y) {
+            let dy = y % wSpike;
+            if (dy < 0) dy += wSpike;
+            if (dy < wSpike / 2) {
+                return arena.x + (dy / (wSpike / 2)) * hSpike;
+            } else {
+                return arena.x + (1 - (dy - wSpike / 2) / (wSpike / 2)) * hSpike;
+            }
+        }
+
+        // Get Right Spike boundary X-coordinate for given Y
+        function getSpikeRightX(y) {
+            let dy = y % wSpike;
+            if (dy < 0) dy += wSpike;
+            if (dy < wSpike / 2) {
+                return arena.x + arena.width - (dy / (wSpike / 2)) * hSpike;
+            } else {
+                return arena.x + arena.width - (1 - (dy - wSpike / 2) / (wSpike / 2)) * hSpike;
+            }
+        }
+
+        // Normal vector calculations pointing inwards
+        function getTopSpikeNormal(dx) {
+            let nx = dx < wSpike / 2 ? -hSpike : hSpike;
+            let ny = wSpike / 2;
+            let len = Math.hypot(nx, ny);
+            return { x: nx / len, y: ny / len };
+        }
+
+        function getBottomSpikeNormal(dx) {
+            let nx = dx < wSpike / 2 ? -hSpike : hSpike;
+            let ny = -wSpike / 2;
+            let len = Math.hypot(nx, ny);
+            return { x: nx / len, y: ny / len };
+        }
+
+        function getLeftSpikeNormal(dy) {
+            let nx = wSpike / 2;
+            let ny = dy < wSpike / 2 ? -hSpike : hSpike;
+            let len = Math.hypot(nx, ny);
+            return { x: nx / len, y: ny / len };
+        }
+
+        function getRightSpikeNormal(dy) {
+            let nx = -wSpike / 2;
+            let ny = dy < wSpike / 2 ? -hSpike : hSpike;
+            let len = Math.hypot(nx, ny);
+            return { x: nx / len, y: ny / len };
+        }
+
+        // Get 16 peripheral sample points of the rotating square
+        function getBlockSamplePoints(x, y, size, angle) {
+            const points = [];
+            const half = size / 2;
+            
+            // Subdivide edges to get dense points for collision accuracy
+            // 4 corners, 4 midpoints, 8 quarter-points
+            const localPoints = [
+                // Vertices
+                {x: -half, y: -half}, {x: half, y: -half}, {x: half, y: half}, {x: -half, y: half},
+                // Midpoints
+                {x: 0, y: -half}, {x: half, y: 0}, {x: 0, y: half}, {x: -half, y: 0},
+                // Quarter-points
+                {x: -half/2, y: -half}, {x: half/2, y: -half},
+                {x: half, y: -half/2}, {x: half, y: half/2},
+                {x: half/2, y: half}, {x: -half/2, y: half},
+                {x: -half, y: -half/2}, {x: -half, y: half/2}
+            ];
+
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            for (let p of localPoints) {
+                points.push({
+                    x: x + p.x * cos - p.y * sin,
+                    y: y + p.x * sin + p.y * cos,
+                    lx: p.x, // store local coordinate for crack mapping
+                    ly: p.y
+                });
+            }
+            return points;
+        }
+
+        // Procedural recursive cracks generator
+        function generateCrack(startX, startY, angle, length, depth) {
+            if (depth <= 0 || length < 2.5) return [];
+            let endX = startX + Math.cos(angle) * length;
+            let endY = startY + Math.sin(angle) * length;
+            
+            let lines = [{x1: startX, y1: startY, x2: endX, y2: endY}];
+            
+            // Random branching logic
+            let branches = Math.random() < 0.38 ? 2 : 1;
+            for (let i = 0; i < branches; i++) {
+                // Angle points generally inwards toward block center (0,0)
+                let targetAngle = angle + (Math.random() - 0.5) * 0.9;
+                let nextLen = length * (0.55 + Math.random() * 0.35);
+                lines = lines.concat(generateCrack(endX, endY, targetAngle, nextLen, depth - 1));
+            }
+            return lines;
+        }
+
+        // Particle pool instantiation
+        function spawnSpark(x, y, vx, vy, size = 2) {
+            let p = null;
+            for (let item of particlesPool) {
+                if (!item.active) {
+                    p = item;
+                    break;
+                }
+            }
+            if (!p) {
+                p = new Particle();
+                particlesPool.push(p);
+            }
+            p.init(
+                x, y, 
+                vx, vy, 
+                currentTheme.particle, 
+                size, 
+                0.3 + Math.random() * 0.4
+            );
+            particles.push(p);
+        }
+
+        // Create shards when shattering
+        function triggerShatterBlast(bx, by, size, angle, vx, vy) {
+            playShatter();
+            
+            const numShards = 45;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            
+            for (let i = 0; i < numShards; i++) {
+                // Generate random triangles inside the block area
+                let r1 = Math.random() * (size / 2);
+                let a1 = Math.random() * Math.PI * 2;
+                
+                let r2 = Math.random() * (size / 2);
+                let a2 = a1 + 0.35 + Math.random() * 0.7;
+                
+                let r3 = Math.random() * (size / 2);
+                let a3 = a2 + 0.35 + Math.random() * 0.7;
+                
+                let p1 = { x: r1 * Math.cos(a1), y: r1 * Math.sin(a1) };
+                let p2 = { x: r2 * Math.cos(a2), y: r2 * Math.sin(a2) };
+                let p3 = { x: r3 * Math.cos(a3), y: r3 * Math.sin(a3) };
+                
+                // Centroid in local space
+                let cx = (p1.x + p2.x + p3.x) / 3;
+                let cy = (p1.y + p2.y + p3.y) / 3;
+                
+                // Coordinates relative to centroid
+                let v1 = { x: p1.x - cx, y: p1.y - cy };
+                let v2 = { x: p2.x - cx, y: p2.y - cy };
+                let v3 = { x: p3.x - cx, y: p3.y - cy };
+                
+                // Translate centroid to global space based on rotation
+                let gcx = bx + cx * cos - cy * sin;
+                let gcy = by + cx * sin + cy * cos;
+                
+                // Inherited block speed + blast offset outwards from center
+                let dist = Math.hypot(cx, cy);
+                let dirX = dist > 0 ? cx / dist : (Math.random() - 0.5);
+                let dirY = dist > 0 ? cy / dist : (Math.random() - 0.5);
+                
+                let blastSpeed = 80 + Math.random() * 160;
+                let svx = vx * 0.6 + dirX * blastSpeed;
+                let svy = vy * 0.6 + dirY * blastSpeed;
+                
+                let sAngle = angle + (Math.random() - 0.5) * 0.8;
+                let sVAngle = (Math.random() - 0.5) * 9.0;
+                
+                shards.push(new Shard(
+                    gcx, gcy, 
+                    [v1, v2, v3], 
+                    svx, svy, 
+                    sAngle, sVAngle, 
+                    currentTheme.glassC1, 
+                    currentTheme.glassBorder
+                ));
+            }
+            
+            // Add a cloud of small shiny dust particles
+            for (let j = 0; j < 35; j++) {
+                let dx = (Math.random() - 0.5) * size * 0.7;
+                let dy = (Math.random() - 0.5) * size * 0.7;
+                let px = bx + dx * cos - dy * sin;
+                let py = by + dx * sin + dy * cos;
+                
+                let spX = vx * 0.5 + (Math.random() - 0.5) * 200;
+                let spY = vy * 0.5 + (Math.random() - 0.5) * 200;
+                
+                spawnSpark(px, py, spX, spY, 1 + Math.random() * 2);
+            }
+        }
+
+
+        // --- Collision Logic ---
+        function checkCollisions() {
+            if (!block || !block.active) return;
+
+            const size = block.size * block.pulseScale;
+            const points = getBlockSamplePoints(block.x, block.y, size, block.angle);
+            
+            let totalNx = 0;
+            let totalNy = 0;
+            let maxPenetration = 0;
+            let collisionPoints = [];
+            let hitType = null; // 'top', 'bottom', 'left', 'right'
+            
+            for (let p of points) {
+                let pPen = 0;
+                let pNx = 0;
+                let pNy = 0;
+                let isHit = false;
+
+                // 1. Top spikes collision
+                let spikeYTop = getSpikeTopY(p.x);
+                if (p.y < spikeYTop) {
+                    let dx = p.x % wSpike;
+                    if (dx < 0) dx += wSpike;
+                    let norm = getTopSpikeNormal(dx);
+                    pNx = norm.x;
+                    pNy = norm.y;
+                    pPen = spikeYTop - p.y;
+                    isHit = true;
+                    hitType = 'top';
+                }
+
+                // 2. Bottom spikes collision
+                let spikeYBottom = getSpikeBottomY(p.x);
+                if (p.y > spikeYBottom) {
+                    let dx = p.x % wSpike;
+                    if (dx < 0) dx += wSpike;
+                    let norm = getBottomSpikeNormal(dx);
+                    pNx = norm.x;
+                    pNy = norm.y;
+                    pPen = p.y - spikeYBottom;
+                    isHit = true;
+                    hitType = 'bottom';
+                }
+
+                // 3. Left spikes collision
+                let spikeXLeft = getSpikeLeftX(p.y);
+                if (p.x < spikeXLeft) {
+                    let dy = p.y % wSpike;
+                    if (dy < 0) dy += wSpike;
+                    let norm = getLeftSpikeNormal(dy);
+                    pNx = norm.x;
+                    pNy = norm.y;
+                    pPen = spikeXLeft - p.x;
+                    isHit = true;
+                    hitType = 'left';
+                }
+
+                // 4. Right spikes collision
+                let spikeXRight = getSpikeRightX(p.y);
+                if (p.x > spikeXRight) {
+                    let dy = p.y % wSpike;
+                    if (dy < 0) dy += wSpike;
+                    let norm = getRightSpikeNormal(dy);
+                    pNx = norm.x;
+                    pNy = norm.y;
+                    pPen = p.x - spikeXRight;
+                    isHit = true;
+                    hitType = 'right';
+                }
+
+                if (isHit) {
+                    totalNx += pNx;
+                    totalNy += pNy;
+                    if (pPen > maxPenetration) maxPenetration = pPen;
+                    collisionPoints.push(p);
+                }
+            }
+
+            if (collisionPoints.length > 0) {
+                // Determine collision normal direction
+                let len = Math.hypot(totalNx, totalNy);
+                let nx = totalNx / len;
+                let ny = totalNy / len;
+
+                // Check relative movement: velocity must face opposite of normal
+                let vDotN = block.vx * nx + block.vy * ny;
+                if (vDotN < 0) {
+                    // Elastic Bounce: reflect velocity vector
+                    block.vx = block.vx - 2 * vDotN * nx;
+                    block.vy = block.vy - 2 * vDotN * ny;
+
+                    // Ensure absolutely NO velocity loss (perfect elasticity)
+                    let currentSpeed = Math.hypot(block.vx, block.vy);
+                    block.vx = (block.vx / currentSpeed) * baseSpeed;
+                    block.vy = (block.vy / currentSpeed) * baseSpeed;
+
+                    // Resolve penetration along normal
+                    block.x += nx * maxPenetration;
+                    block.y += ny * maxPenetration;
+
+                    // Find average collision point coordinates
+                    let avgCx = 0, avgCy = 0;
+                    let avgLx = 0, avgLy = 0; // local coordinates
+                    for (let cp of collisionPoints) {
+                        avgCx += cp.x;
+                        avgCy += cp.y;
+                        avgLx += cp.lx;
+                        avgLy += cp.ly;
+                    }
+                    avgCx /= collisionPoints.length;
+                    avgCy /= collisionPoints.length;
+                    avgLx /= collisionPoints.length;
+                    avgLy /= collisionPoints.length;
+
+                    // Apply rotational impulse (Torque) based on collision offset
+                    // Torque = r_local_x * normal_local_y - r_local_y * normal_local_x
+                    // Map normal to block's local orientation to compute torque
+                    let cos = Math.cos(-block.angle);
+                    let sin = Math.sin(-block.angle);
+                    let lnx = nx * cos - ny * sin;
+                    let lny = nx * sin + ny * cos;
+                    let torque = avgLx * lny - avgLy * lnx;
+                    block.vAngle += torque * 0.04; 
+                    
+                    // Cap angular velocity to prevent crazy spinning
+                    let maxSpinner = 4.0;
+                    if (Math.abs(block.vAngle) > maxSpinner) {
+                        block.vAngle = Math.sign(block.vAngle) * maxSpinner;
+                    }
+
+                    // Dynamic bounce collision consequences
+                    block.bounces++;
+                    
+                    if (block.bounces >= maxBounce) {
+                        // Shatter event!
+                        triggerShatterBlast(block.x, block.y, size, block.angle, block.vx, block.vy);
+                        block.active = false;
+                        nextSpawnTimer = 1.3; // 1.3 seconds delay
+                        updateHUD(maxBounce);
+                    } else {
+                        // Play pitched clink sound (pitch goes up as size increases)
+                        let pitch = 0.9 + (block.bounces / maxBounce) * 0.45;
+                        playClink(pitch);
+
+                        // Visual Pulse spring scale
+                        block.pulseScale = 1.22;
+
+                        // Expand physical block size by 15% of baseSize on each hit
+                        block.size += block.baseSize * 0.15;
+
+                        // Procedural Cracking
+                        // Calculate angle of cracks pointing from impact point to center
+                        let crackAngle = Math.atan2(-avgLy, -avgLx);
+                        let crackDepth = 2 + Math.floor(Math.random() * 2);
+                        let crackLen = (block.size / 2) * (0.6 + Math.random() * 0.35);
+                        
+                        let generatedLines = generateCrack(avgLx, avgLy, crackAngle, crackLen, crackDepth);
+                        block.crackLines = block.crackLines.concat(generatedLines);
+
+                        // Chip off minor shards flying away from normal
+                        let numSparks = 3 + Math.floor(Math.random() * 3);
+                        for (let k = 0; k < numSparks; k++) {
+                            let reflectVDirX = nx + (Math.random() - 0.5) * 0.7;
+                            let reflectVDirY = ny + (Math.random() - 0.5) * 0.7;
+                            let refLen = Math.hypot(reflectVDirX, reflectVDirY);
+                            
+                            let sparkSpeed = 100 + Math.random() * 150;
+                            spawnSpark(
+                                avgCx, avgCy, 
+                                (reflectVDirX / refLen) * sparkSpeed, 
+                                (reflectVDirY / refLen) * sparkSpeed,
+                                1.5 + Math.random() * 1.5
+                            );
+                        }
+
+                        updateHUD(block.bounces);
+                    }
+                }
+            }
+
+            // Extreme Safety Constraints (Ensure block can never clip outside spikes)
+            let limitMargin = hSpike + block.size / 2 + 5;
+            if (block.x < arena.x + limitMargin) {
+                block.x = arena.x + limitMargin;
+                if (block.vx < 0) block.vx *= -1;
+            }
+            if (block.x > arena.x + arena.width - limitMargin) {
+                block.x = arena.x + arena.width - limitMargin;
+                if (block.vx > 0) block.vx *= -1;
+            }
+            if (block.y < arena.y + limitMargin) {
+                block.y = arena.y + limitMargin;
+                if (block.vy < 0) block.vy *= -1;
+            }
+            if (block.y > arena.y + arena.height - limitMargin) {
+                block.y = arena.y + arena.height - limitMargin;
+                if (block.vy > 0) block.vy *= -1;
+            }
+        }
+
+
+        // --- GUI Handlers ---
+        function updateSpeedVal(val) {
+            baseSpeed = parseInt(val);
+            document.getElementById('valSpeed').textContent = `${baseSpeed} px/s`;
+            
+            // Immediately scale current block speed if alive
+            if (block && block.active) {
+                let currSpeed = Math.hypot(block.vx, block.vy);
+                if (currSpeed > 0) {
+                    block.vx = (block.vx / currSpeed) * baseSpeed;
+                    block.vy = (block.vy / currSpeed) * baseSpeed;
+                }
+            }
+        }
+
+        function updateMaxBounceVal(val) {
+            maxBounce = parseInt(val);
+            document.getElementById('valMaxBounce').textContent = `${maxBounce} 次`;
+            document.getElementById('maxBounceVal').textContent = maxBounce;
+            
+            // If active block already has more bounces than new max, shatter it!
+            if (block && block.active && block.bounces >= maxBounce) {
+                let size = block.size * block.pulseScale;
+                triggerShatterBlast(block.x, block.y, size, block.angle, block.vx, block.vy);
+                block.active = false;
+                nextSpawnTimer = 1.3;
+            }
+        }
+
+        function updateGravityVal(val) {
+            gravityVal = parseInt(val);
+            document.getElementById('valGravity').textContent = `${gravityVal} px/s²`;
+        }
+
+        function updateSpikeVal(val) {
+            hSpike = parseInt(val);
+            document.getElementById('valSpike').textContent = `${hSpike} px`;
+        }
+
+        function updateHUD(bounces) {
+            document.getElementById('bounceVal').textContent = bounces;
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtnText');
+            const icon = document.getElementById('pauseIcon');
+            if (isPaused) {
+                btn.textContent = "继续";
+                icon.innerHTML = '<path d="M8 5v14l11-7z" stroke-linecap="round"/>';
+            } else {
+                btn.textContent = "暂停";
+                icon.innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z" stroke-linecap="round"/>';
+                lastTime = performance.now(); // reset delta time helper
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function resetBlock() {
+            shards = [];
+            particles = [];
+            nextSpawnTimer = 0;
+            if (block) {
+                block.reset();
+            } else {
+                block = new Block();
+            }
+            if (isPaused) {
+                togglePause();
+            }
+        }
+
+
+        // --- Canvas Rendering Loop ---
+
+        function drawArenaSpikes() {
+            ctx.save();
+            ctx.fillStyle = currentTheme.spikes;
+            ctx.shadowColor = currentTheme.spikes;
+            ctx.shadowBlur = 12;
+
+            // 1. Top Spikes
+            ctx.beginPath();
+            for (let x = 0; x < arena.width; x += wSpike) {
+                ctx.moveTo(x, arena.y);
+                ctx.lineTo(x + wSpike / 2, arena.y + hSpike);
+                ctx.lineTo(x + wSpike, arena.y);
+            }
+            ctx.fill();
+
+            // 2. Bottom Spikes
+            ctx.beginPath();
+            for (let x = 0; x < arena.width; x += wSpike) {
+                ctx.moveTo(x, arena.y + arena.height);
+                ctx.lineTo(x + wSpike / 2, arena.y + arena.height - hSpike);
+                ctx.lineTo(x + wSpike, arena.y + arena.height);
+            }
+            ctx.fill();
+
+            // 3. Left Spikes
+            ctx.beginPath();
+            for (let y = 0; y < arena.height; y += wSpike) {
+                ctx.moveTo(arena.x, y);
+                ctx.lineTo(arena.x + hSpike, y + wSpike / 2);
+                ctx.lineTo(arena.x, y + wSpike);
+            }
+            ctx.fill();
+
+            // 4. Right Spikes
+            ctx.beginPath();
+            for (let y = 0; y < arena.height; y += wSpike) {
+                ctx.moveTo(arena.x + arena.width, y);
+                ctx.lineTo(arena.x + arena.width - hSpike, y + wSpike / 2);
+                ctx.lineTo(arena.x + arena.width, y + wSpike);
+            }
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawCracks(ctx, size, crackLines) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.45)';
+            ctx.shadowBlur = 4;
+            ctx.lineWidth = 1.35;
+            
+            for (let line of crackLines) {
+                ctx.beginPath();
+                ctx.moveTo(line.x1, line.y1);
+                ctx.lineTo(line.x2, line.y2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawBlock() {
+            if (!block || !block.active) return;
+
+            ctx.save();
+            ctx.translate(block.x, block.y);
+            ctx.rotate(block.angle);
+
+            // Apply global alpha if block is fading in on spawn
+            ctx.globalAlpha = block.spawnProgress;
+
+            let renderSize = block.size * block.pulseScale;
+            let half = renderSize / 2;
+            let radius = 6; // slightly rounded corners
+
+            // Drop Shadow Blur for premium glass depth
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+            ctx.shadowBlur = 18;
+            ctx.shadowOffsetX = 8;
+            ctx.shadowOffsetY = 10;
+
+            // Draw rounded square path
+            ctx.beginPath();
+            ctx.moveTo(-half + radius, -half);
+            ctx.lineTo(half - radius, -half);
+            ctx.quadraticCurveTo(half, -half, half, -half + radius);
+            ctx.lineTo(half, half - radius);
+            ctx.quadraticCurveTo(half, half, half - radius, half);
+            ctx.lineTo(-half + radius, half);
+            ctx.quadraticCurveTo(-half, half, -half, half - radius);
+            ctx.lineTo(-half, -half + radius);
+            ctx.quadraticCurveTo(-half, -half, -half + radius, -half);
+            ctx.closePath();
+
+            // Glass gradient fill
+            let grad = ctx.createLinearGradient(-half, -half, half, half);
+            grad.addColorStop(0, currentTheme.glassC1);
+            grad.addColorStop(1, currentTheme.glassC2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Specular Reflection (Diagonal Highlight Line)
+            ctx.beginPath();
+            ctx.moveTo(-half + 5, -half + 2);
+            ctx.lineTo(half - 2, -half + 5);
+            ctx.lineTo(-half + 2, half - 5);
+            ctx.closePath();
+            
+            let shineGrad = ctx.createLinearGradient(-half, -half, half, half);
+            shineGrad.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+            shineGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.08)');
+            shineGrad.addColorStop(0.31, 'rgba(255, 255, 255, 0)');
+            shineGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = shineGrad;
+            ctx.shadowColor = 'transparent'; // cancel shadow for highlights
+            ctx.fill();
+
+            // Glowing Glass Borders
+            ctx.strokeStyle = currentTheme.glassBorder;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
+
+            // Specular top rim shine highlight
+            ctx.beginPath();
+            ctx.moveTo(-half + radius, -half + 1);
+            ctx.lineTo(half - radius, -half + 1);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Render crack patterns inside block
+            drawCracks(ctx, renderSize, block.crackLines);
+
+            ctx.restore();
+        }
+
+        // --- Core Loop Animation Engine ---
+        let lastTime = 0;
+
+        function loop(timestamp) {
+            if (isPaused) return;
+
+            if (!lastTime) lastTime = timestamp;
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // Cap dt to prevent massive jumps when switching browser tabs
+            if (dt > 0.1) dt = 0.1;
+
+            // 1. Clear Arena Context
+            ctx.fillStyle = '#030407';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw a subtle wireframe outline inside canvas border
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(hSpike, hSpike, canvas.width - hSpike * 2, canvas.height - hSpike * 2);
+
+            // 2. Physics & State Updates
+            if (block && block.active) {
+                block.update(dt);
+                checkCollisions();
+            } else {
+                // If block is shattered, process respawn countdown
+                if (nextSpawnTimer > 0) {
+                    nextSpawnTimer -= dt;
+                    if (nextSpawnTimer <= 0) {
+                        block.reset();
+                    }
+                }
+            }
+
+            // Update & prune active falling shards
+            for (let i = shards.length - 1; i >= 0; i--) {
+                shards[i].update(dt);
+                if (shards[i].alpha <= 0) {
+                    shards.splice(i, 1);
+                }
+            }
+
+            // Update & prune active sparks
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update(dt);
+                if (!particles[i].active) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // 3. Rendering
+            drawArenaSpikes();
+            
+            // Draw Shards
+            for (let s of shards) {
+                s.draw(ctx);
+            }
+
+            // Draw Sparks
+            for (let p of particles) {
+                p.draw(ctx);
+            }
+
+            // Draw Block
+            drawBlock();
+
+            requestAnimationFrame(loop);
+        }
+
+        // Initialize App
+        block = new Block();
+        lastTime = performance.now();
+        requestAnimationFrame(loop);
+        
+    </script>
+</body>
+</html>
